@@ -2,7 +2,10 @@
 import { eventPublisher } from './event-publisher.service';
 import { SettlementEvent } from './event-publisher.service';
 import { query, getConnection } from './database.service';
-import { PoolClient } from 'pg';
+import {
+    recordSettlementSuccess,
+    recordSettlementFailure,
+} from './metrics.service';
 import {
     SettlementStatus,
     TransactionStatus,
@@ -248,6 +251,22 @@ export async function phase1LockFunds(
         await client.query('ROLLBACK');
         console.error('❌ Phase 1 lock failed:', error);
 
+        // Record failure metrics
+        try {
+            const settlementResult = await query(
+                `SELECT seller_id FROM settlements WHERE id = $1`,
+                [req.settlement_id]
+            );
+            if (settlementResult.rows.length > 0) {
+                recordSettlementFailure(
+                    settlementResult.rows[0].seller_id,
+                    (error as Error).message
+                );
+            }
+        } catch (metricError) {
+            console.error('Failed to record metric:', metricError);
+        }
+
         // Log failure
         try {
             const settlementResult = await query(
@@ -339,6 +358,16 @@ export async function phase2Commit(
             { status: SettlementStatus.COMPLETED },
             null
         );
+
+        // ===== RECORD METRICS (SEBELUM COMMIT) =====
+        const startTime = Date.now();
+        console.log('📊 Recording settlement success metrics...');
+        recordSettlementSuccess(
+            settlement.seller_id,
+            parseFloat(settlement.total_amount),
+            (Date.now() - startTime) / 1000
+        );
+        // ==========================================
 
         // Publish event
         try {
