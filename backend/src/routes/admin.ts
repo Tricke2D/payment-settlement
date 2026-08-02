@@ -45,21 +45,18 @@ router.get('/reconciliation', async (req: Request, res: Response) => {
 /**
  * POST /api/admin/reconciliation/run-manual - Manual reconciliation
  */
-router.post('/reconciliation/run-manual', async (req: Request, res: Response) => {
+router.post('/sellers', async (req: Request, res: Response) => {
     try {
-        console.log('🚀 Manual reconciliation triggered');
-        const result = await reconciliationEngine.runDailyReconciliation();
-
-        res.json({
-            success: true,
-            data: result,
-        });
+        const { seller_code, name, email, total_balance } = req.body;
+        const result = await query(
+            `INSERT INTO sellers (seller_code, name, email, total_balance, status)
+             VALUES ($1, $2, $3, $4, 'active')
+             RETURNING *`,
+            [seller_code, name, email, total_balance]
+        );
+        res.json({ success: true, data: result.rows[0] });
     } catch (error) {
-        console.error('❌ Reconciliation failed:', error);
-        res.status(500).json({
-            success: false,
-            error: (error as Error).message,
-        });
+        res.status(500).json({ success: false, error: (error as Error).message });
     }
 });
 

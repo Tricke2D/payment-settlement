@@ -1,0 +1,29 @@
+app = "payment-settlement-app"
+primary_region = "sin"
+
+[build]
+dockerfile = "Dockerfile"
+
+[env]
+PORT = "3001"
+NODE_ENV = "production"
+DB_HOST = "postgresql://postgres:Namelight2111200@db.qluoowsjamslptpqwjiu.supabase.co:5432/postgres"
+DB_PORT = "5432"
+DB_NAME = "settlement_engine"
+DB_USER = "postgres"
+DB_PASSWORD = "postgres123"
+REDIS_HOST = "redis"
+REDIS_PORT = "6379"
+KAFKA_BROKERS = "kafka:9092"
+SENDGRID_API_KEY = "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"
+EMAIL_FROM = "mhdsyukronzakka@gmail.com"
+MIDTRANS_SERVER_KEY = "Mid-server-CqqMII0Wo3xZI2AFMAotb2rh"
+MIDTRANS_IS_PRODUCTION = "false"
+
+[http_service]
+internal_port = 3001
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 0
+processes = ["app"]

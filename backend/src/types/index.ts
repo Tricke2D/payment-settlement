@@ -26,6 +26,7 @@ export enum AuditAction {
     PHASE_2_ROLLBACK = 'phase_2_rollback',
     SETTLEMENT_COMPLETED = 'settlement_completed',
     SETTLEMENT_FAILED = 'settlement_failed',
+    PAYMENT_RECEIVED = 'payment_received',
 }
 
 // Interfaces

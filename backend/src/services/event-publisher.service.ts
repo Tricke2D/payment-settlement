@@ -34,6 +34,12 @@ class EventPublisher {
     private isConnected = false;
 
     async connect(): Promise<void> {
+        // Jika producer tidak tersedia (Kafka disabled), skip
+        if (!producer) {
+            console.log('⚠️ Kafka producer not available, skipping connect');
+            this.isConnected = false;
+            return;
+        }
         try {
             await producer.connect();
             this.isConnected = true;
@@ -45,14 +51,24 @@ class EventPublisher {
     }
 
     async disconnect(): Promise<void> {
-        if (this.isConnected) {
+        if (!producer || !this.isConnected) {
+            this.isConnected = false;
+            return;
+        }
+        try {
             await producer.disconnect();
             this.isConnected = false;
             console.log('✅ Kafka Producer disconnected');
+        } catch (error) {
+            console.error('❌ Error disconnecting producer:', error);
         }
     }
 
     async publishSettlementEvent(event: SettlementEvent): Promise<void> {
+        if (!producer || !this.isConnected) {
+            console.log(`⚠️ Kafka disabled, skipping event publish: ${event.event_type}`);
+            return;
+        }
         try {
             await producer.send({
                 topic: 'settlement-events',
@@ -65,16 +81,10 @@ class EventPublisher {
                             'timestamp': new Date().toISOString(),
                             'correlation-id': event.event_id,
                         },
-                        partition: Math.abs(
-                            event.settlement_id.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
-                        ) % 3,
                     },
                 ],
             });
-
-            console.log(
-                `📤 Settlement event published: ${event.event_type} for settlement ${event.settlement_id}`
-            );
+            console.log(`📤 Settlement event published: ${event.event_type} for ${event.settlement_id}`);
         } catch (error) {
             console.error('❌ Failed to publish settlement event:', error);
             throw error;
@@ -82,6 +92,10 @@ class EventPublisher {
     }
 
     async publishNotificationEvent(event: NotificationEvent): Promise<void> {
+        if (!producer || !this.isConnected) {
+            console.log(`⚠️ Kafka disabled, skipping notification: ${event.event_type}`);
+            return;
+        }
         try {
             await producer.send({
                 topic: 'notifications',
@@ -98,10 +112,7 @@ class EventPublisher {
                     },
                 ],
             });
-
-            console.log(
-                `📬 Notification event published: ${event.event_type} to ${event.recipient_id}`
-            );
+            console.log(`📬 Notification event published: ${event.event_type} to ${event.recipient_id}`);
         } catch (error) {
             console.error('❌ Failed to publish notification event:', error);
             throw error;
@@ -114,6 +125,10 @@ class EventPublisher {
         reason: string,
         retryCount: number
     ): Promise<void> {
+        if (!producer || !this.isConnected) {
+            console.log(`⚠️ Kafka disabled, skipping DLQ publish`);
+            return;
+        }
         try {
             const dlqEvent = {
                 dlq_id: `DLQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -124,7 +139,6 @@ class EventPublisher {
                 retry_count: retryCount,
                 status: 'pending_manual_review',
             };
-
             await producer.send({
                 topic: 'settlement-dlq',
                 messages: [
@@ -139,10 +153,7 @@ class EventPublisher {
                     },
                 ],
             });
-
-            console.log(
-                `⚠️  Event sent to DLQ: ${reason} (retry #${retryCount})`
-            );
+            console.log(`⚠️ Event sent to DLQ: ${reason} (retry #${retryCount})`);
         } catch (error) {
             console.error('❌ Failed to publish to DLQ:', error);
             throw error;

@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark Mode Styles */
+.dark body {
+    background-color: #1a1a2e;
+    color: #e2e8f0;
+}
+
+.dark .bg-white {
+    background-color: #16213e;
+}
+
+.dark .bg-gray-50 {
+    background-color: #1e293b;
+}
+
+.dark .bg-gray-100 {
+    background-color: #0f172a;
+}
+
+.dark .text-gray-800 {
+    color: #e2e8f0;
+}
+
+.dark .text-gray-600 {
+    color: #94a3b8;
+}
+
+.dark .text-gray-500 {
+    color: #64748b;
+}
+
+.dark .border-gray-300 {
+    border-color: #2d3748;
+}
+
+.dark .divide-gray-200 > * {
+    border-color: #2d3748;
+}
+
+.dark .shadow-md {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+}
+
+.dark input,
+.dark select {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-color: #2d3748;
+}
+
+.dark input::placeholder {
+    color: #64748b;
+}
+
+.dark .hover\:bg-gray-50:hover {
+    background-color: #1e293b;
+}
+
+.dark .bg-blue-600 {
+    background-color: #2563eb;
+}
+
+.dark .bg-blue-600:hover {
+    background-color: #1d4ed8;
+}

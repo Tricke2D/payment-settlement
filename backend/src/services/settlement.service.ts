@@ -1,6 +1,7 @@
 // src/services/settlement.service.ts
 import { eventPublisher } from './event-publisher.service';
 import { SettlementEvent } from './event-publisher.service';
+const midtransClient = require('midtrans-client');
 import { query, getConnection } from './database.service';
 import {
     recordSettlementSuccess,
@@ -476,9 +477,66 @@ export async function phase2Rollback(
     }
 }
 
-// Helper: Simulate payment gateway call
+// Helper: Integrate with Midtrans Payment Gateway
 async function processPaymentGateway(settlement: any): Promise<boolean> {
-    // TODO: Integrate with Stripe or Midtrans
-    // For now, 95% success rate (simulate realistic conditions)
-    return Math.random() < 0.95;
+    try {
+        // 1. Inisialisasi client Midtrans
+        const snap = new midtransClient.Snap({
+            isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+            serverKey: process.env.MIDTRANS_SERVER_KEY || '',
+            clientKey: process.env.MIDTRANS_CLIENT_KEY || '',
+        });
+
+        // 2. Siapkan data transaksi
+        const parameter = {
+            transaction_details: {
+                order_id: settlement.settlement_id,
+                gross_amount: Math.round(settlement.total_amount),
+            },
+        };
+
+        // 3. Panggil API Midtrans
+        const transaction = await snap.createTransaction(parameter);
+        const paymentUrl = transaction.redirect_url;
+
+        console.log(`💰 Midtrans transaction created for order: ${settlement.settlement_id}`);
+        console.log(`🔗 Payment URL: ${paymentUrl}`);
+
+        // 4. Kirim email dengan URL pembayaran
+        try {
+            const sellerEmail = await query(
+                `SELECT email FROM sellers WHERE id = $1`,
+                [settlement.seller_id]
+            );
+
+            if (sellerEmail.rows.length > 0) {
+                const { notificationService } = await import('./notification.service');
+                await notificationService.send({
+                    notification_id: `PAYMENT-${Date.now()}`,
+                    timestamp: new Date(),
+                    event_type: 'payment.url',
+                    recipient_type: 'seller',
+                    recipient_id: settlement.settlement_id,
+                    title: '🔗 Link Pembayaran Midtrans',
+                    message: `Klik link berikut untuk menyelesaikan pembayaran:\n\n${paymentUrl}`,
+                    channel: 'email',
+                    priority: 'high',
+                    settlement_id: settlement.settlement_id,
+                    metadata: {
+                        payment_url: paymentUrl,
+                        seller_email: sellerEmail.rows[0].email,
+                    },
+                });
+                console.log(`📧 Payment URL sent to seller email`);
+            }
+        } catch (emailError) {
+            console.error('❌ Failed to send payment URL email:', emailError);
+        }
+
+        return true;
+
+    } catch (error) {
+        console.error('❌ Midtrans payment error:', error);
+        return false;
+    }
 }

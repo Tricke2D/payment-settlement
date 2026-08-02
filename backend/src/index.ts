@@ -10,10 +10,17 @@ import { eventConsumer } from './services/event-consumer.service';
 import { register } from 'prom-client';
 import { startReconciliationScheduler } from './services/reconciliation.service';
 import adminRoutes from './routes/admin';
+import paymentRoutes from './routes/payment.routes';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './docs/swagger';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
 const app = express();
+
+// Mengaktifkan trust proxy
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
@@ -26,10 +33,32 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+});
+
+// Rate limiting - 100 request per 15 menit
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 menit
+    max: 100,
+    message: {
+        success: false,
+        error: 'Too many requests, please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.use('/api', limiter);
+
 // Routes
 app.use('/api/settlements', settlementRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -61,7 +90,8 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Route not found' });
 });
 
-const PORT = process.env.PORT || 3001;
+// ===== HANYA SATU DEKLARASI PORT =====
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 // Graceful shutdown
 const gracefulShutdown = async () => {
@@ -83,21 +113,24 @@ const gracefulShutdown = async () => {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
-// Start server
-const server = app.listen(PORT, async () => {
+// Start server (pakai PORT yang sudah dideklarasikan)
+const server = app.listen(PORT, '0.0.0.0', async () => {
     console.log(`✅ Settlement Engine API running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV}`);
 
     // Initialize Kafka
     try {
-        await eventPublisher.connect();
-        await eventConsumer.connect();
-        await eventConsumer.startSettlementEventConsumer();
-        await eventConsumer.startDLQConsumer();
-        console.log('✅ Kafka initialized and consumers running');
+        if (process.env.KAFKA_BROKERS && process.env.KAFKA_BROKERS !== 'localhost:29092') {
+            await eventPublisher.connect();
+            await eventConsumer.connect();
+            await eventConsumer.startSettlementEventConsumer();
+            await eventConsumer.startDLQConsumer();
+            console.log('✅ Kafka initialized');
+        } else {
+            console.log('⚠️ Kafka disabled in production');
+        }
     } catch (error) {
         console.error('❌ Failed to initialize Kafka:', error);
-        console.error('⚠️  API will continue running without event streaming');
     }
     // Start reconciliation scheduler
     startReconciliationScheduler();

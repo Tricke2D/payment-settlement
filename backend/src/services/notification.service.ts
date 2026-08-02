@@ -1,6 +1,16 @@
 // src/services/notification.service.ts
 import { NotificationEvent } from './event-publisher.service';
 import { query } from './database.service';
+import sgMail from '@sendgrid/mail';
+
+// ===== SET API KEY =====
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || '';
+if (SENDGRID_API_KEY) {
+    sgMail.setApiKey(SENDGRID_API_KEY);
+    console.log('✅ SendGrid initialized');
+} else {
+    console.warn('⚠️ SENDGRID_API_KEY not set, using stub mode');
+}
 
 interface EmailPayload {
     to: string;
@@ -23,35 +33,44 @@ interface NotificationResult {
 
 class NotificationService {
     /**
-     * Send email notification (stub - integrate with SendGrid/AWS SES later)
+     * Send email notification using SendGrid
      */
     private async sendEmail(payload: EmailPayload): Promise<NotificationResult> {
         try {
-            console.log(`📧 [STUB] Sending email to ${payload.to}`);
-            console.log(`   Subject: ${payload.subject}`);
-            console.log(`   Body: ${payload.body}`);
+            // Jika SendGrid tidak di-set, pakai stub
+            if (!SENDGRID_API_KEY) {
+                console.log(`📧 [STUB] Sending email to ${payload.to}`);
+                console.log(`   Subject: ${payload.subject}`);
+                console.log(`   Body: ${payload.body}`);
+                return {
+                    success: true,
+                    channel: 'email',
+                    message_id: `STUB-${Date.now()}`,
+                };
+            }
 
-            // TODO: Integrate with real email service
-            // const response = await sendgrid.send({
-            //   to: payload.to,
-            //   from: process.env.SENDGRID_FROM_EMAIL,
-            //   subject: payload.subject,
-            //   html: payload.html || payload.body,
-            // });
+            const msg = {
+                to: payload.to,
+                from: process.env.EMAIL_FROM || 'noreply@settlement.com',
+                subject: payload.subject,
+                html: payload.html || payload.body.replace(/\n/g, '<br>'),
+            };
 
-            const messageId = `EMAIL-${Date.now()}`;
+            await sgMail.send(msg);
+            console.log(`📧 Email sent to ${payload.to}`);
 
             return {
                 success: true,
                 channel: 'email',
-                message_id: messageId,
+                message_id: `SG-${Date.now()}`,
             };
-        } catch (error) {
-            console.error('❌ Failed to send email:', error);
+        } catch (error: any) {
+            const errorMsg = error?.response?.body?.errors?.[0]?.message || error?.message || 'Unknown error';
+            console.error('❌ SendGrid error:', errorMsg);
             return {
                 success: false,
                 channel: 'email',
-                error: (error as Error).message,
+                error: errorMsg,
             };
         }
     }
@@ -63,20 +82,10 @@ class NotificationService {
         try {
             console.log(`📱 [STUB] Sending SMS to ${payload.phone}`);
             console.log(`   Message: ${payload.message}`);
-
-            // TODO: Integrate with real SMS service
-            // const response = await twilio.messages.create({
-            //   body: payload.message,
-            //   from: process.env.TWILIO_PHONE_NUMBER,
-            //   to: payload.phone,
-            // });
-
-            const messageId = `SMS-${Date.now()}`;
-
             return {
                 success: true,
                 channel: 'sms',
-                message_id: messageId,
+                message_id: `SMS-${Date.now()}`,
             };
         } catch (error) {
             console.error('❌ Failed to send SMS:', error);
@@ -94,8 +103,6 @@ class NotificationService {
     private async sendPushNotification(payload: any): Promise<NotificationResult> {
         try {
             console.log(`🔔 [STUB] Sending push notification`);
-
-            // TODO: Integrate with Firebase Cloud Messaging
             return {
                 success: true,
                 channel: 'push',
@@ -115,7 +122,6 @@ class NotificationService {
      */
     async send(notification: NotificationEvent): Promise<NotificationResult> {
         try {
-            // Get seller info for contact details
             const sellerResult = await query(
                 `SELECT email, seller_code FROM sellers WHERE seller_code = $1`,
                 [notification.recipient_id]
@@ -145,7 +151,7 @@ class NotificationService {
 
                 case 'sms':
                     result = await this.sendSMS({
-                        phone: '+6281234567890', // Placeholder
+                        phone: '+6281234567890',
                         message: notification.message,
                     });
                     break;
@@ -166,7 +172,7 @@ class NotificationService {
             if (result.success) {
                 await query(
                     `INSERT INTO audit_logs (entity_type, entity_id, action, new_state, created_at)
-           VALUES ($1, $2, $3, $4, NOW())`,
+                     VALUES ($1, $2, $3, $4, NOW())`,
                     [
                         'notifications',
                         notification.notification_id,
@@ -179,14 +185,11 @@ class NotificationService {
                         }),
                     ]
                 );
-
-                console.log(
-                    `✅ Notification sent via ${notification.channel}: ${result.message_id}`
-                );
+                console.log(`✅ Notification sent via ${notification.channel}: ${result.message_id}`);
             } else {
                 await query(
                     `INSERT INTO audit_logs (entity_type, entity_id, action, new_state, created_at)
-           VALUES ($1, $2, $3, $4, NOW())`,
+                     VALUES ($1, $2, $3, $4, NOW())`,
                     [
                         'notifications',
                         notification.notification_id,
@@ -199,7 +202,6 @@ class NotificationService {
                         }),
                     ]
                 );
-
                 console.log(`❌ Notification failed via ${notification.channel}: ${result.error}`);
             }
 
@@ -219,37 +221,37 @@ class NotificationService {
      */
     private buildEmailHTML(notification: NotificationEvent): string {
         return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <style>
-            body { font-family: Arial, sans-serif; }
-            .container { max-width: 600px; margin: 0 auto; }
-            .header { background-color: #f5f5f5; padding: 20px; }
-            .content { padding: 20px; }
-            .footer { background-color: #f5f5f5; padding: 10px; font-size: 12px; }
-            .success { color: #28a745; }
-            .error { color: #dc3545; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>${notification.title}</h2>
-            </div>
-            <div class="content">
-              <p>${notification.message}</p>
-              <p>Settlement ID: ${notification.settlement_id}</p>
-              <p>Timestamp: ${new Date(notification.timestamp).toLocaleString('id-ID')}</p>
-            </div>
-            <div class="footer">
-              <p>© 2024 Payment Settlement Engine. All rights reserved.</p>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
+            <!DOCTYPE html>
+            <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body { font-family: Arial, sans-serif; }
+                        .container { max-width: 600px; margin: 0 auto; }
+                        .header { background-color: #f5f5f5; padding: 20px; }
+                        .content { padding: 20px; }
+                        .footer { background-color: #f5f5f5; padding: 10px; font-size: 12px; }
+                        .success { color: #28a745; }
+                        .error { color: #dc3545; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h2>${notification.title}</h2>
+                        </div>
+                        <div class="content">
+                            <p>${notification.message}</p>
+                            <p>Settlement ID: ${notification.settlement_id}</p>
+                            <p>Timestamp: ${new Date(notification.timestamp).toLocaleString('id-ID')}</p>
+                        </div>
+                        <div class="footer">
+                            <p>© 2024 Payment Settlement Engine. All rights reserved.</p>
+                        </div>
+                    </div>
+                </body>
+            </html>
+        `;
     }
 }
 

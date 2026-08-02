@@ -12,7 +12,6 @@
     "resolveJsonModule": true,
     "moduleResolution": "node",
     "types": ["node", "jest"],
-    "verbatimModuleSyntax": false,
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*"],

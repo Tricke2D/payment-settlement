@@ -2,20 +2,16 @@ import { Kafka, logLevel } from 'kafkajs';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
 
-// Gunakan kafka:9092 (nama service di docker-compose)
-const brokers = process.env.KAFKA_BROKERS
-    ? process.env.KAFKA_BROKERS.split(',')
-    : ['kafka:9092'];
+// Jika di production dan tidak ada KAFKA_BROKERS, nonaktifkan
+const isKafkaEnabled = !!process.env.KAFKA_BROKERS && process.env.KAFKA_BROKERS !== 'localhost:29092';
 
-console.log('📡 Kafka brokers:', brokers);
-console.log('🔍 KAFKA_BROKERS from env:', process.env.KAFKA_BROKERS);
+console.log(`📡 Kafka enabled: ${isKafkaEnabled}`);
 
-const kafka = new Kafka({
+const kafka = isKafkaEnabled ? new Kafka({
     clientId: 'settlement-engine',
-    brokers: brokers,
+    brokers: process.env.KAFKA_BROKERS?.split(',') || [],
     logLevel: logLevel.ERROR,
     connectionTimeout: 10000,
     requestTimeout: 30000,
@@ -23,25 +19,26 @@ const kafka = new Kafka({
         initialRetryTime: 300,
         retries: 8,
     },
-});
+}) : null;
 
-export const producer = kafka.producer({
+// Export yang aman
+export const producer = kafka?.producer({
     maxInFlightRequests: 5,
     idempotent: true,
     transactionTimeout: 30000,
 });
 
-export const consumer = kafka.consumer({
+export const consumer = kafka?.consumer({
     groupId: 'settlement-notification-service',
     sessionTimeout: 30000,
     heartbeatInterval: 3000,
     rebalanceTimeout: 60000,
 });
 
-export const deadLetterConsumer = kafka.consumer({
+export const deadLetterConsumer = kafka?.consumer({
     groupId: 'settlement-dlq-consumer',
 });
 
-export const admin = kafka.admin();
+export const admin = kafka?.admin();
 
 export default kafka;
