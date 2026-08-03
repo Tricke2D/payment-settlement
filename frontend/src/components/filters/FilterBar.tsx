@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 interface FilterBarProps {
     onFilter: (filters: any) => void;
+    onReset?: () => void;
     onExport?: () => void;
     onExportCSV?: () => void;
     loading?: boolean;

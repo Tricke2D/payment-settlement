@@ -21,10 +21,10 @@ router.get('/reconciliation', async (req: Request, res: Response) => {
         }
 
         const result = await query(
-            `SELECT * FROM reconciliation_records 
+            `SELECT * FROM reconciliation_records
              WHERE ${whereClause}
-             ORDER BY reconciliation_date DESC 
-             LIMIT $${params.length + 1}`,
+             ORDER BY reconciliation_date DESC
+                 LIMIT $${params.length + 1}`,
             [...params, limit]
         );
 
@@ -45,18 +45,99 @@ router.get('/reconciliation', async (req: Request, res: Response) => {
 /**
  * POST /api/admin/reconciliation/run-manual - Manual reconciliation
  */
+router.post('/reconciliation/run-manual', async (req: Request, res: Response) => {
+    try {
+        console.log('🚀 Manual reconciliation triggered');
+        const result = await reconciliationEngine.runDailyReconciliation();
+
+        res.json({
+            success: true,
+            data: result,
+        });
+    } catch (error) {
+        console.error('❌ Reconciliation failed:', error);
+        res.status(500).json({
+            success: false,
+            error: (error as Error).message,
+        });
+    }
+});
+
+/**
+ * POST /api/admin/sellers - Tambah seller baru
+ */
 router.post('/sellers', async (req: Request, res: Response) => {
     try {
         const { seller_code, name, email, total_balance } = req.body;
+
+        // Validasi input
+        if (!seller_code || !name || !email) {
+            return res.status(400).json({
+                success: false,
+                error: 'seller_code, name, and email required'
+            });
+        }
+
+        // Cek apakah seller_code sudah ada
+        const checkResult = await query(
+            `SELECT id FROM sellers WHERE seller_code = $1`,
+            [seller_code]
+        );
+
+        if (checkResult.rows.length > 0) {
+            return res.status(400).json({
+                success: false,
+                error: `Seller code ${seller_code} already exists`
+            });
+        }
+
+        // Insert seller
         const result = await query(
             `INSERT INTO sellers (seller_code, name, email, total_balance, status)
              VALUES ($1, $2, $3, $4, 'active')
-             RETURNING *`,
-            [seller_code, name, email, total_balance]
+                 RETURNING id, seller_code, name, email, total_balance, status`,
+            [seller_code, name, email, total_balance || 0]
         );
-        res.json({ success: true, data: result.rows[0] });
+
+        res.json({
+            success: true,
+            data: result.rows[0]
+        });
+    } catch (error: any) {
+        console.error('❌ Error adding seller:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Failed to add seller'
+        });
+    }
+});
+
+/**
+ * GET /api/admin/sellers - Get all sellers
+ */
+router.get('/sellers', async (req: Request, res: Response) => {
+    try {
+        const { limit = 100, offset = 0 } = req.query;
+
+        const result = await query(
+            `SELECT id, seller_code, name, email, total_balance, status, created_at
+             FROM sellers
+             ORDER BY id
+             LIMIT $1 OFFSET $2`,
+            [limit, offset]
+        );
+
+        res.json({
+            success: true,
+            data: result.rows,
+            count: result.rows.length,
+        });
     } catch (error) {
-        res.status(500).json({ success: false, error: (error as Error).message });
+        console.error('❌ Error fetching sellers:', error);
+        res.status(500).json({
+            success: false,
+            error: (error as Error).message,
+        });
     }
 });
 
@@ -66,9 +147,9 @@ router.post('/sellers', async (req: Request, res: Response) => {
 router.get('/dashboard', async (req: Request, res: Response) => {
     try {
         const statsResult = await query(
-            `SELECT 
-                status,
-                COUNT(*) as count,
+            `SELECT
+                 status,
+                 COUNT(*) as count,
                 SUM(total_amount) as total_amount
              FROM settlements
              GROUP BY status`
@@ -86,7 +167,7 @@ router.get('/dashboard', async (req: Request, res: Response) => {
             `SELECT id, settlement_id, seller_id, total_amount, status, created_at
              FROM settlements
              ORDER BY created_at DESC
-             LIMIT 10`
+                 LIMIT 10`
         );
 
         res.json({

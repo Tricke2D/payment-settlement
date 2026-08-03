@@ -22,6 +22,16 @@ const app = express();
 // Mengaktifkan trust proxy
 app.set('trust proxy', 1);
 
+// ===== CORS CONFIGURATION =====
+app.use(cors({
+    origin: '*', // Allow all origins (for development)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+}));
+
 // Middleware
 app.use(helmet());
 app.use(cors());

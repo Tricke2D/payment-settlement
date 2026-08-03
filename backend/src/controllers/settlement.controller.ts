@@ -35,7 +35,6 @@ export const phase1Lock = async (req: Request, res: Response) => {
     try {
         const settlementId = req.params.settlementId as string;
 
-        // Cari settlement berdasarkan settlement_id (string)
         const settlementResult = await query(
             `SELECT id FROM settlements WHERE settlement_id = $1`,
             [settlementId]
@@ -49,7 +48,6 @@ export const phase1Lock = async (req: Request, res: Response) => {
         }
 
         const dbId = settlementResult.rows[0].id;
-
         const result = await settlementService.phase1LockFunds({
             settlement_id: dbId,
             ...req.body
@@ -124,7 +122,7 @@ export const getSettlement = async (req: Request, res: Response) => {
     try {
         const settlementId = req.params.settlementId as string;
 
-        const result = await query(
+        let result = await query(
             `SELECT s.*,
                     u.name as seller_name,
                     COUNT(si.id) as item_count
@@ -135,6 +133,24 @@ export const getSettlement = async (req: Request, res: Response) => {
              GROUP BY s.id, u.name`,
             [settlementId]
         );
+
+        // Fallback: coba sebagai numeric ID
+        if (result.rows.length === 0) {
+            const numericId = parseInt(settlementId);
+            if (!isNaN(numericId)) {
+                result = await query(
+                    `SELECT s.*,
+                            u.name as seller_name,
+                            COUNT(si.id) as item_count
+                     FROM settlements s
+                              LEFT JOIN sellers u ON s.seller_id = u.id
+                              LEFT JOIN settlement_items si ON s.id = si.settlement_id
+                     WHERE s.id = $1
+                     GROUP BY s.id, u.name`,
+                    [numericId]
+                );
+            }
+        }
 
         if (result.rows.length === 0) {
             return res.status(404).json({
@@ -161,11 +177,21 @@ export const getAuditTrail = async (req: Request, res: Response) => {
     try {
         const settlementId = req.params.settlementId as string;
 
-        // Cari settlement berdasarkan settlement_id
-        const settlementResult = await query(
+        let settlementResult = await query(
             `SELECT id FROM settlements WHERE settlement_id = $1`,
             [settlementId]
         );
+
+        // Fallback: coba sebagai numeric ID
+        if (settlementResult.rows.length === 0) {
+            const numericId = parseInt(settlementId);
+            if (!isNaN(numericId)) {
+                settlementResult = await query(
+                    `SELECT id FROM settlements WHERE id = $1`,
+                    [numericId]
+                );
+            }
+        }
 
         if (settlementResult.rows.length === 0) {
             return res.status(404).json({
@@ -177,7 +203,7 @@ export const getAuditTrail = async (req: Request, res: Response) => {
         const dbId = settlementResult.rows[0].id;
 
         const result = await query(
-            `SELECT * FROM audit_logs 
+            `SELECT * FROM audit_logs
              WHERE entity_type = 'settlements' AND entity_id = $1
              ORDER BY created_at DESC`,
             [dbId]

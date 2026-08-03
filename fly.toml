@@ -7,16 +7,27 @@ dockerfile = "Dockerfile"
 [env]
 PORT = "3001"
 NODE_ENV = "production"
-DB_HOST = "postgresql://postgres:Namelight2111200@db.qluoowsjamslptpqwjiu.supabase.co:5432/postgres"
+
+# Supabase Connection
+DATABASE_URL = "postgresql://postgres:Namelight2111200@db.qluoowsjamslptpqwjiu.supabase.co:5432/postgres"
+DB_HOST = "db.qluoowsjamslptpqwjiu.supabase.co"
 DB_PORT = "5432"
-DB_NAME = "settlement_engine"
+DB_NAME = "postgres"
 DB_USER = "postgres"
-DB_PASSWORD = "postgres123"
+DB_PASSWORD = "Namelight2111200"
+
+# Redis (jika pakai)
 REDIS_HOST = "redis"
 REDIS_PORT = "6379"
-KAFKA_BROKERS = "kafka:9092"
+
+# Kafka (disabled)
+# KAFKA_BROKERS = "kafka:9092"
+
+# Email
 SENDGRID_API_KEY = "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"
 EMAIL_FROM = "mhdsyukronzakka@gmail.com"
+
+# Midtrans
 MIDTRANS_SERVER_KEY = "Mid-server-CqqMII0Wo3xZI2AFMAotb2rh"
 MIDTRANS_IS_PRODUCTION = "false"
 

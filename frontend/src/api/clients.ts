@@ -27,8 +27,11 @@ export const settlementAPI = {
     // Reconciliation
     runReconciliation: () => api.post('/admin/reconciliation/run-manual'),
 
-    // 🔥 TAMBAHKAN INI UNTUK SELLER
+    // 🔥 TAMBAHKAN INI
+    getSellers: () => api.get('/admin/sellers'),
     addSeller: (data: any) => api.post('/admin/sellers', data),
+    addTransaction: (data: any) => api.post('/admin/transactions', data),
+    sendEmail: (data: any) => api.post('/admin/email', data),
 };
 
 export default api;

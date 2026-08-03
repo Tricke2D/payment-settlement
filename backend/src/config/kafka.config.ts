@@ -4,14 +4,24 @@ import path from 'path';
 
 dotenv.config();
 
-// Jika di production dan tidak ada KAFKA_BROKERS, nonaktifkan
-const isKafkaEnabled = !!process.env.KAFKA_BROKERS && process.env.KAFKA_BROKERS !== 'localhost:29092';
+// Cek apakah Kafka diaktifkan
+const isKafkaEnabled = !!process.env.KAFKA_BROKERS &&
+    process.env.KAFKA_BROKERS !== 'localhost:29092' &&
+    process.env.KAFKA_BROKERS !== 'kafka:9092';
 
 console.log(`📡 Kafka enabled: ${isKafkaEnabled}`);
+console.log(`📡 KAFKA_BROKERS: ${process.env.KAFKA_BROKERS}`);
 
+// Buat kafka instance hanya jika enabled
 const kafka = isKafkaEnabled ? new Kafka({
     clientId: 'settlement-engine',
     brokers: process.env.KAFKA_BROKERS?.split(',') || [],
+    ssl: process.env.KAFKA_BROKERS?.includes('upstash') || process.env.KAFKA_BROKERS?.includes('confluent'),
+    sasl: process.env.KAFKA_BROKERS?.includes('upstash') || process.env.KAFKA_BROKERS?.includes('confluent') ? {
+        mechanism: 'scram-sha-256',
+        username: process.env.KAFKA_SASL_USERNAME || '',
+        password: process.env.KAFKA_SASL_PASSWORD || '',
+    } : undefined,
     logLevel: logLevel.ERROR,
     connectionTimeout: 10000,
     requestTimeout: 30000,
@@ -21,7 +31,7 @@ const kafka = isKafkaEnabled ? new Kafka({
     },
 }) : null;
 
-// Export yang aman
+// Export dengan fallback null
 export const producer = kafka?.producer({
     maxInFlightRequests: 5,
     idempotent: true,
