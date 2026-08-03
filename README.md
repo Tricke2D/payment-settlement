@@ -423,4 +423,4 @@ MIT License — silakan digunakan untuk keperluan belajar dan pengembangan.
 
 ---
 
-**Made with ❤️ by [Your Name]**
+**Made with ❤️ by Muhamad Syukron Zakka**
