@@ -1,0 +1,19 @@
+{
+  "name": "PaymentSettlement",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "private": true,
+  "dependencies": {
+    "express-rate-limit": "^8.6.1",
+    "prom-client": "^15.1.3"
+  },
+  "devDependencies": {
+    "@types/express-rate-limit": "^5.1.3"
+  }
+}
